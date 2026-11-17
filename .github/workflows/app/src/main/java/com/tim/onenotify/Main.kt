@@ -93,7 +93,7 @@ class NotifyService : NotificationListenerService() {
 
         val ranking = Ranking()
         if (currentRanking.getRanking(sbn.key, ranking) &&
-            ranking.importance < NotificationManager.IMPORTANCE_HIGH
+            ranking.importance < NotificationManager.IMPORTANCE_DEFAULT
         ) return
 
         val ex = n.extras
