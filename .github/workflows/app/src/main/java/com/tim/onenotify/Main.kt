@@ -2,7 +2,7 @@ package com.tim.onenotify
 
 import android.app.Activity
 import android.app.Notification
-import android.app.NotificationManager
+import android.content.ComponentName
 import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.PixelFormat
@@ -28,6 +28,16 @@ import android.widget.LinearLayout
 import android.widget.TextView
 
 class MainActivity : Activity() {
+    private val h = Handler(Looper.getMainLooper())
+    private var status: TextView? = null
+    private val tick = object : Runnable {
+        override fun run() {
+            val s = if (NotifyService.instance != null) "подключён" else "НЕ подключён"
+            status?.text = "Сервис: $s\nПолучено: ${NotifyService.count}\n${NotifyService.log}"
+            h.postDelayed(this, 1000)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val pad = (24 * resources.displayMetrics.density).toInt()
@@ -52,7 +62,19 @@ class MainActivity : Activity() {
             )
         }
         btn("Тест") { NotifyService.instance?.demo() }
+        status = TextView(this).apply { textSize = 14f; setPadding(0, pad, 0, 0) }
+        root.addView(status)
         setContentView(root)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        h.post(tick)
+    }
+
+    override fun onPause() {
+        h.removeCallbacks(tick)
+        super.onPause()
     }
 }
 
@@ -60,6 +82,8 @@ class NotifyService : NotificationListenerService() {
 
     companion object {
         var instance: NotifyService? = null
+        var count = 0
+        var log = "ещё ничего не приходило"
     }
 
     private val handler = Handler(Looper.getMainLooper())
@@ -78,6 +102,10 @@ class NotifyService : NotificationListenerService() {
 
     override fun onListenerDisconnected() {
         instance = null
+        try {
+            requestRebind(ComponentName(this, NotifyService::class.java))
+        } catch (e: Exception) {
+        }
     }
 
     override fun onDestroy() {
@@ -87,20 +115,30 @@ class NotifyService : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         if (sbn.packageName == packageName) return
+        count++
         val n = sbn.notification
-        if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
-        if (n.flags and Notification.FLAG_ONGOING_EVENT != 0) return
-
-        
+        val pkg = sbn.packageName
+        if (n.flags and Notification.FLAG_ONGOING_EVENT != 0) {
+            log = "#$count $pkg: пропущено (постоянное)"
+            return
+        }
+        if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) {
+            log = "#$count $pkg: пропущено (сводка группы)"
+            return
+        }
 
         val ex = n.extras
         val title = ex.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
         val text = (ex.getCharSequence(Notification.EXTRA_BIG_TEXT)
             ?: ex.getCharSequence(Notification.EXTRA_TEXT))?.toString().orEmpty()
-        if (title.isBlank() && text.isBlank()) return
+        if (title.isBlank() && text.isBlank()) {
+            log = "#$count $pkg: пропущено (пустой текст)"
+            return
+        }
+        log = "#$count $pkg: показываю"
 
         val icon = try {
-            packageManager.getApplicationIcon(sbn.packageName)
+            packageManager.getApplicationIcon(pkg)
         } catch (e: Exception) {
             null
         }
@@ -123,7 +161,10 @@ class NotifyService : NotificationListenerService() {
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
     private fun show(title: String, text: String, icon: Drawable?, onTap: (() -> Unit)?) {
-        if (!Settings.canDrawOverlays(this)) return
+        if (!Settings.canDrawOverlays(this)) {
+            log += " | нет разрешения поверх окон"
+            return
+        }
         removeNow()
 
         val dark = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
@@ -211,6 +252,7 @@ class NotifyService : NotificationListenerService() {
         try {
             wm.addView(container, lp)
         } catch (e: Exception) {
+            log += " | ошибка окна: ${e.message}"
             return
         }
         current = container
