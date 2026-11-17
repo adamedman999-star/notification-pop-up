@@ -253,7 +253,16 @@ class NotifyService : NotificationListenerService() {
             return
         }
         current = container
-
+        
+        handler.postDelayed({
+            if (current === container) {
+                log += " | окно видно: ${container.isShown}, прозрачность ${card.alpha}"
+                card.alpha = 1f
+                card.scaleX = 1f
+                col.alpha = 1f
+            }
+        }, 700)
+        
         // Раскрытие в стороны от центра
         card.alpha = 0f
         card.scaleX = 0.3f
