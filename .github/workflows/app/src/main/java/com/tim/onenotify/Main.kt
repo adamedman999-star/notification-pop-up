@@ -115,13 +115,10 @@ class NotifyService : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         if (sbn.packageName == packageName) return
-        count++
-        val n = sbn.notification
+                val n = sbn.notification
         val pkg = sbn.packageName
-        if (n.flags and Notification.FLAG_ONGOING_EVENT != 0) {
-            log = "#$count $pkg: пропущено (постоянное)"
-            return
-        }
+        if (n.flags and Notification.FLAG_ONGOING_EVENT != 0) return
+        count++
         if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) {
             log = "#$count $pkg: пропущено (сводка группы)"
             return
