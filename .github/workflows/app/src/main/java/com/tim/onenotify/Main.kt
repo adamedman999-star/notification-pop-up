@@ -243,7 +243,7 @@ class NotifyService : NotificationListenerService() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP
-            y = statusBar + dp(4)
+            y = dp(4)
         }
 
         try {
