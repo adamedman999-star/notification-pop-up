@@ -4,7 +4,7 @@ import android.app.Activity
 import android.app.Notification
 import android.content.ComponentName
 import android.content.Intent
-import android.content.res.Configuration
+import android.graphics.Outline
 import android.graphics.PixelFormat
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
@@ -19,6 +19,7 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewOutlineProvider
 import android.view.WindowManager
 import android.view.animation.DecelerateInterpolator
 import android.widget.Button
@@ -115,7 +116,7 @@ class NotifyService : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         if (sbn.packageName == packageName) return
-                val n = sbn.notification
+        val n = sbn.notification
         val pkg = sbn.packageName
         if (n.flags and Notification.FLAG_ONGOING_EVENT != 0) return
         count++
@@ -134,13 +135,18 @@ class NotifyService : NotificationListenerService() {
         }
         log = "#$count $pkg: показываю"
 
-        val icon = try {
-            packageManager.getApplicationIcon(pkg)
-        } catch (e: Exception) {
-            null
-        }
         handler.post {
-            show(title, text, icon) {
+            val appIcon = try {
+                packageManager.getApplicationIcon(pkg)
+            } catch (e: Exception) {
+                null
+            }
+            val avatar = try {
+                n.getLargeIcon()?.loadDrawable(this)
+            } catch (e: Exception) {
+                null
+            }
+            show(title, text, avatar, appIcon) {
                 try {
                     n.contentIntent?.send()
                 } catch (e: Exception) {
@@ -151,38 +157,69 @@ class NotifyService : NotificationListenerService() {
 
     fun demo() {
         handler.post {
-            show("OneNotify", "Так будут выглядеть уведомления", null, null)
+            val appIcon = try {
+                packageManager.getApplicationIcon(packageName)
+            } catch (e: Exception) {
+                null
+            }
+            show("OneNotify", "Так будут выглядеть уведомления", null, appIcon, null)
         }
     }
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
-    private fun show(title: String, text: String, icon: Drawable?, onTap: (() -> Unit)?) {
+    private fun show(
+        title: String,
+        text: String,
+        avatar: Drawable?,
+        appIcon: Drawable?,
+        onTap: (() -> Unit)?
+    ) {
         if (!Settings.canDrawOverlays(this)) {
             log += " | нет разрешения поверх окон"
             return
         }
         removeNow()
 
-        val dark = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
-            Configuration.UI_MODE_NIGHT_YES
-        val bg = if (dark) 0xFF2B2B2B.toInt() else 0xFFF6F6F6.toInt()
-        val fg = if (dark) 0xFFFFFFFF.toInt() else 0xFF111111.toInt()
-        val fg2 = if (dark) 0xFFBBBBBB.toInt() else 0xFF555555.toInt()
+        val fg = 0xFF111111.toInt()
+        val fg2 = 0xFF555555.toInt()
 
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(16), dp(14), dp(16), dp(14))
             background = GradientDrawable().apply {
-                setColor(bg)
-                cornerRadius = dp(26).toFloat()
+                setColor(0xFFFFFFFF.toInt())
+                cornerRadius = dp(30).toFloat()
+                setStroke(dp(1), 0x22000000)
             }
         }
-        if (icon != null) {
-            card.addView(ImageView(this).apply { setImageDrawable(icon) },
-                LinearLayout.LayoutParams(dp(40), dp(40)).apply { marginEnd = dp(12) })
+
+        val photo = avatar ?: appIcon
+        if (photo != null) {
+            val box = FrameLayout(this)
+            val photoView = ImageView(this).apply {
+                setImageDrawable(photo)
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                if (avatar != null) {
+                    outlineProvider = object : ViewOutlineProvider() {
+                        override fun getOutline(view: View, outline: Outline) {
+                            outline.setOval(0, 0, view.width, view.height)
+                        }
+                    }
+                    clipToOutline = true
+                }
+            }
+            box.addView(photoView, FrameLayout.LayoutParams(dp(48), dp(48)))
+            if (avatar != null && appIcon != null) {
+                box.addView(
+                    ImageView(this).apply { setImageDrawable(appIcon) },
+                    FrameLayout.LayoutParams(dp(22), dp(22), Gravity.BOTTOM or Gravity.END)
+                )
+            }
+            card.addView(box, LinearLayout.LayoutParams(dp(54), dp(54)).apply { marginEnd = dp(12) })
         }
+
         val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         if (title.isNotBlank()) {
             col.addView(TextView(this).apply {
@@ -232,8 +269,6 @@ class NotifyService : NotificationListenerService() {
             }
         }
 
-        val statusBar = resources.getIdentifier("status_bar_height", "dimen", "android")
-            .let { if (it > 0) resources.getDimensionPixelSize(it) else dp(24) }
         val lp = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -253,16 +288,15 @@ class NotifyService : NotificationListenerService() {
             return
         }
         current = container
-        
+
         handler.postDelayed({
             if (current === container) {
-                log += " | окно видно: ${container.isShown}, прозрачность ${card.alpha}"
                 card.alpha = 1f
                 card.scaleX = 1f
                 col.alpha = 1f
             }
         }, 700)
-        
+
         // Раскрытие в стороны от центра
         card.alpha = 0f
         card.scaleX = 0.3f
