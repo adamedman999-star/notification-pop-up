@@ -91,10 +91,7 @@ class NotifyService : NotificationListenerService() {
         if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
         if (n.flags and Notification.FLAG_ONGOING_EVENT != 0) return
 
-        val ranking = Ranking()
-        if (currentRanking.getRanking(sbn.key, ranking) &&
-            ranking.importance < NotificationManager.IMPORTANCE_DEFAULT
-        ) return
+        
 
         val ex = n.extras
         val title = ex.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
