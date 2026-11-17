@@ -187,7 +187,7 @@ class NotifyService : NotificationListenerService() {
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(16), dp(14), dp(16), dp(14))
+            setPadding(dp(16), dp(8), dp(16), dp(8))
             background = GradientDrawable().apply {
                 setColor(0xFFFFFFFF.toInt())
                 cornerRadius = dp(30).toFloat()
@@ -210,14 +210,14 @@ class NotifyService : NotificationListenerService() {
                     clipToOutline = true
                 }
             }
-            box.addView(photoView, FrameLayout.LayoutParams(dp(48), dp(48)))
+              box.addView(photoView, FrameLayout.LayoutParams(dp(40), dp(40)))
             if (avatar != null && appIcon != null) {
                 box.addView(
                     ImageView(this).apply { setImageDrawable(appIcon) },
-                    FrameLayout.LayoutParams(dp(22), dp(22), Gravity.BOTTOM or Gravity.END)
+                    FrameLayout.LayoutParams(dp(18), dp(18), Gravity.BOTTOM or Gravity.END)
                 )
             }
-            card.addView(box, LinearLayout.LayoutParams(dp(54), dp(54)).apply { marginEnd = dp(12) })
+         card.addView(box, LinearLayout.LayoutParams(dp(44), dp(44)).apply { marginEnd = dp(12) })
         }
 
         val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
