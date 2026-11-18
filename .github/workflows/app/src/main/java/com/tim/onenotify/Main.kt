@@ -91,7 +91,7 @@ class NotifyService : NotificationListenerService() {
     private lateinit var wm: WindowManager
     private var current: View? = null
     private val autoHide = Runnable { dismiss() }
-
+    private val lastShown = HashMap<String, String>()
     override fun onCreate() {
         super.onCreate()
         wm = getSystemService(WINDOW_SERVICE) as WindowManager
@@ -133,7 +133,13 @@ class NotifyService : NotificationListenerService() {
             log = "#$count $pkg: пропущено (пустой текст)"
             return
         }
-        log = "#$count $pkg: показываю"
+        val fp = "$title|$text|${n.`when`}"
+if (lastShown[sbn.key] == fp) {
+    log = "#$count $pkg: пропущено (уже показывали)"
+    return
+}
+lastShown[sbn.key] = fp
+log = "#$count $pkg: показываю"
 
         handler.post {
             val appIcon = try {
@@ -154,7 +160,9 @@ class NotifyService : NotificationListenerService() {
             }
         }
     }
-
+override fun onNotificationRemoved(sbn: StatusBarNotification) {
+    lastShown.remove(sbn.key)
+}
     fun demo() {
         handler.post {
             val appIcon = try {
